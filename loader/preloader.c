@@ -541,6 +541,12 @@ SYSCALL_NOERR( wld_getegid, 177 /* SYS_getegid */ );
 
 /* replacement for libc functions */
 
+static int wld_strcat(char *dest, const char *src)
+{
+    while (*dest) dest ++;
+    while (*src) { * dest = * src; dest ++; src ++; }
+}
+
 static int wld_strcmp( const char *str1, const char *str2 )
 {
     while (*str1 && (*str1 == *str2)) { str1++; str2++; }
@@ -1255,7 +1261,7 @@ void* wld_start( void **stack )
 {
     long i, *pargc;
     char **argv, **p;
-    char *interp, *reserve = NULL;
+    char *interp, *reserve, *rootpath = NULL;
     struct wld_auxv new_av[8], delete_av[3], *av;
     struct wld_link_map main_binary_map, ld_so_map;
     struct wine_preload_info **wine_main_preload_info;
@@ -1272,6 +1278,10 @@ void* wld_start( void **stack )
     {
         static const char res[] = "WINEPRELOADRESERVE=";
         if (!wld_strncmp( *p, res, sizeof(res)-1 )) reserve = *p + sizeof(res) - 1;
+
+        static const char root[] = "LINUXFILEROOT=";
+        if (!wld_strncmp( *p, root, sizeof(root)-1 )) rootpath = *p + sizeof(root) - 1;
+
         p++;
     }
 
@@ -1324,7 +1334,16 @@ void* wld_start( void **stack )
 
     /* load the ELF interpreter */
     interp = (char *)main_binary_map.l_addr + main_binary_map.l_interp;
-    map_so_lib( interp, &ld_so_map );
+
+    char fullpath[256] = {};
+    wld_memset(fullpath, 0, sizeof(fullpath));
+
+    if (rootpath != NULL)
+        wld_strcat(fullpath, rootpath);
+
+    wld_strcat(fullpath, interp);
+
+    map_so_lib( fullpath, &ld_so_map );
 
     /* store pointer to the preload info into the appropriate main binary variable */
     wine_main_preload_info = find_symbol( &main_binary_map, "wine_main_preload_info", STT_OBJECT );
