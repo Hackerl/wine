@@ -562,7 +562,26 @@ static void preloader_exec( char **argv, int use_preloader )
         free( new_argv );
         free( full_name );
     }
-    execv( argv[0], argv );
+    else
+    {
+        char * wineloader = getenv("WINELDLIBRARY");
+
+        if (wineloader == NULL)
+            execv( argv[0], argv );
+
+        char **last_arg = argv;
+
+        while (*last_arg) last_arg++;
+
+        char ** new_argv = xmalloc( (last_arg - argv + 2) * sizeof(*argv) );
+        memcpy( new_argv + 1, argv, (last_arg - argv + 1) * sizeof(*argv) );
+
+        new_argv[0] = wineloader;
+
+        execv(wineloader, new_argv);
+
+        free( new_argv );
+    }
 }
 
 /* exec a wine internal binary (either the wine loader or the wine server) */

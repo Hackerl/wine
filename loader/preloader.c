@@ -1255,7 +1255,7 @@ void* wld_start( void **stack )
 {
     long i, *pargc;
     char **argv, **p;
-    char *interp, *reserve = NULL;
+    char *interp = NULL, *reserve = NULL;
     struct wld_auxv new_av[8], delete_av[3], *av;
     struct wld_link_map main_binary_map, ld_so_map;
     struct wine_preload_info **wine_main_preload_info;
@@ -1270,8 +1270,11 @@ void* wld_start( void **stack )
     /* skip over the environment */
     while (*p)
     {
-        static const char res[] = "WINEPRELOADRESERVE=";
+        static const char res[] = "WINEPRELOADRESERVE=", loader[] = "WINELDLIBRARY=";
+
         if (!wld_strncmp( *p, res, sizeof(res)-1 )) reserve = *p + sizeof(res) - 1;
+        if (!wld_strncmp( *p, loader, sizeof(loader)-1 )) interp = *p + sizeof(loader) - 1;
+
         p++;
     }
 
@@ -1323,7 +1326,8 @@ void* wld_start( void **stack )
     map_so_lib( argv[1], &main_binary_map );
 
     /* load the ELF interpreter */
-    interp = (char *)main_binary_map.l_addr + main_binary_map.l_interp;
+    if (interp == NULL)
+        interp = (char *)main_binary_map.l_addr + main_binary_map.l_interp;
     map_so_lib( interp, &ld_so_map );
 
     /* store pointer to the preload info into the appropriate main binary variable */
